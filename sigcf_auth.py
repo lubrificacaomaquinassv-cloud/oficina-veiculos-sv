@@ -4,7 +4,8 @@ from pathlib import Path
 
 import streamlit as st
 
-LOGO_URL = "https://i.postimg.cc/Y9X7ddnb/LOGO-BP.jpg"
+LOGO_URL = "https://raw.githubusercontent.com/lubrificacaomaquinassv-cloud/painel-frota-sv/main/icons/logo_sv.png"
+LOGO_URL_LEGACY = "https://i.postimg.cc/Y9X7ddnb/LOGO-BP.jpg"
 LOGO_FILE = Path(__file__).resolve().parent / "assets" / "logo_santa_verginia.png"
 BG_URL = "https://media.bio.site/sites/32a25c2c-d6fa-4dfc-bdc2-27e4d35d7ea2/AhS9mKiQxFRXAyMBdXDzEG.jpg"
 INSTAGRAM_URL = "https://www.instagram.com/fazendasantaverginia"
@@ -16,15 +17,16 @@ INSTA_ICON = (
 )
 
 
-def logo_html(width: int = 120) -> str:
+def logo_html(width: int = 92) -> str:
+    """Logo SV atual (PNG transparente) — mesmo arquivo dos painéis Gestor/Comboio."""
     if LOGO_FILE.is_file():
         b64 = base64.b64encode(LOGO_FILE.read_bytes()).decode()
         src = f"data:image/png;base64,{b64}"
     else:
         src = LOGO_URL
     return (
-        f'<div class="logo-frame"><img src="{src}" width="{width}" '
-        f'alt="Santa Virgínia"></div>'
+        f'<img class="sv-logo" src="{src}" width="{width}" alt="Santa Virgínia" '
+        f'style="display:block;max-width:{width}px;height:auto;">'
     )
 
 

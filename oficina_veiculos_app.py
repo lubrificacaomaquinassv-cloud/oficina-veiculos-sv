@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 from supabase import Client, create_client
 
-from sigcf_auth import BG_URL, exigir_acesso, link_instagram, logo_html
+from sigcf_auth import BG_URL, LOGO_URL, exigir_acesso, link_instagram, logo_html
 
 TZ_BR = ZoneInfo("America/Sao_Paulo")
 SCHEMA = "oficina_veiculos"
@@ -48,7 +48,12 @@ CSS = """
 [data-testid="stAppViewContainer"]{background:transparent!important;}
 [data-testid="stSidebar"]{display:none;}
 [data-testid="stHeader"]{background:rgba(10,20,9,0.45)!important;}
-.block-container{background:transparent!important;max-width:1240px!important;padding-top:1rem!important;}
+[data-testid="stDecoration"]{display:none!important;}
+.block-container{background:transparent!important;max-width:1240px!important;
+ padding-top:2.75rem!important;padding-bottom:2rem!important;}
+header[data-testid="stHeader"]{background:rgba(10,20,9,0.55)!important;}
+.sv-header-row{margin-top:0.25rem;margin-bottom:0.5rem;}
+[data-testid="stImage"] img{border-radius:8px;}
 h1,h2,h3,h4,p,span,label{color:#e8edd0;}
 h1{font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;}
 .stCaption,[data-testid="stCaptionContainer"] p{color:#9ab892!important;}
@@ -591,9 +596,9 @@ def render_cadastros(sb: Client):
 exigir_acesso("Ordem de Serviço — Oficina Veículos", "SIGCF | Controladoria — Gestão e Análise de Dados")
 st.markdown(CSS.replace("__BG__", BG_URL), unsafe_allow_html=True)
 
-col_logo, col_titulo, col_btn = st.columns([1.1, 4.9, 1])
+col_logo, col_titulo, col_btn = st.columns([1, 5, 1], vertical_alignment="center")
 with col_logo:
-    st.markdown(logo_html(120), unsafe_allow_html=True)
+    st.image(LOGO_URL, width=92)
 with col_titulo:
     st.title("🔧 ORDEM DE SERVIÇO — OFICINA VEÍCULOS")
     st.caption("SIGCF | CONTROLADORIA — GESTÃO E ANÁLISE DE DADOS · Leve · Pesado · Moto")
@@ -602,7 +607,7 @@ with col_titulo:
         unsafe_allow_html=True,
     )
 with col_btn:
-    if st.button("🔄 Atualizar"):
+    if st.button("🔄 Atualizar", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
 
