@@ -13,7 +13,7 @@ from sigcf_auth import BG_URL, LOGO_URL, exigir_acesso, link_instagram, logo_htm
 
 TZ_BR = ZoneInfo("America/Sao_Paulo")
 SCHEMA = "oficina_veiculos"
-MECANICO_PADRAO = "Andre Luis Brito Gomes"
+MECANICO_PADRAO = "ANDRE LUIS BRITO GOMES"
 PRESTADOR_INTERNO = "OFICINA INTERNA — SV"
 
 TIPOS_SERVICO = [
@@ -601,7 +601,7 @@ with col_logo:
     st.image(LOGO_URL, width=92)
 with col_titulo:
     st.title("🔧 ORDEM DE SERVIÇO — OFICINA VEÍCULOS")
-    st.caption("SIGCF | CONTROLADORIA — GESTÃO E ANÁLISE DE DADOS · Leve · Pesado · Moto")
+    st.caption("SIGCF | CONTROLADORIA — GESTÃO E ANÁLISE DE DADOS · LEVE · PESADO · MOTO")
     st.markdown(
         f'<p style="margin:4px 0 0;font-size:13px;">{link_instagram()}</p>',
         unsafe_allow_html=True,
