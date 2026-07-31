@@ -1,0 +1,48 @@
+OFICINA VEÍCULOS SV — Lançamento de OS
+========================================
+
+App Streamlit para ordens de serviço de:
+  • Veículos leves (KWID — frota cadastrada)
+  • Veículos pesados (linha pesada)
+  • Motocicletas
+
+Funcionalidades
+---------------
+  • Lançamento de OS com interface padrão SIGCF (tema escuro SV)
+  • Prestadores de serviço (14 terceiros cadastrados no schema)
+  • Tipos: ELÉTRICO, HIDRÁULICO, SUSPENSÃO, FREIO, CARDAN, REVISÃO GERAL, TROCA DE ÓLEO
+  • Horímetro/KM atual
+  • Troca de óleo: campo odômetro da última troca
+  • OS pendente → editar e concluir depois
+  • Painel: totais por categoria, ranking prestadores e tipos de serviço
+  • Cadastro de veículos pesados/motos e custo/hora do mecânico
+
+Mecânico responsável: Andre Luis Brito Gomes
+
+Instalação local
+----------------
+  cd OFICINA_VEICULOS
+  pip install -r requirements.txt
+  copy .streamlit\secrets.toml.example .streamlit\secrets.toml
+  (edite SUPABASE_URL e SUPABASE_KEY)
+
+Aplicar schema (uma vez)
+------------------------
+  Opção A — Supabase SQL Editor:
+    Cole e execute sql/001_oficina_veiculos_schema.sql
+    Depois sql/002_reload_postgrest_schema.sql
+    Settings > API > Exposed schemas → marque "oficina_veiculos"
+
+  Opção B — PC com senha do banco:
+    pip install -r requirements-cli.txt
+    APLICAR_SCHEMA.bat
+
+Rodar local
+-----------
+  streamlit run oficina_veiculos_app.py
+
+Deploy Streamlit Cloud + GitHub
+-------------------------------
+  Veja DEPLOY_STREAMLIT.txt
+
+Arquivo principal: oficina_veiculos_app.py

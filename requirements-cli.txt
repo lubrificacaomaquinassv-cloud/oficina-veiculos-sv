@@ -1,0 +1,3 @@
+# Scripts locais (aplicar schema no PC)
+psycopg2-binary>=2.9,<3
+tomli>=2.0; python_version < "3.11"

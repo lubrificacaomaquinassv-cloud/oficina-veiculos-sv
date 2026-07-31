@@ -1,0 +1,42 @@
+OFICINA VEÍCULOS — Deploy Streamlit Cloud
+==========================================
+
+1) GITHUB
+   Crie repositório (ex: oficina-veiculos-sv) e envie a pasta OFICINA_VEICULOS.
+   Ou subpasta no repo borracharia apontando Main file para OFICINA_VEICULOS/oficina_veiculos_app.py
+
+2) SCHEMA SUPABASE (obrigatório antes do deploy)
+   SQL Editor → execute sql/001_oficina_veiculos_schema.sql
+   Depois sql/002_reload_postgrest_schema.sql
+   Settings > API > Exposed schemas → adicionar "oficina_veiculos"
+
+3) STREAMLIT CLOUD
+   share.streamlit.io → Create app
+   Repository: seu repo GitHub
+   Branch: main
+   Main file: oficina_veiculos_app.py
+   Advanced settings → Python version: 3.12
+
+4) SECRETS (Settings → Secrets)
+   SUPABASE_URL = "https://azhpxhrwhegfysoeqmft.supabase.co"
+   SUPABASE_KEY = "sua-anon-key"
+   APP_PIN = "SV2026!x"
+
+5) REBOOT
+   Manage app → Reboot app
+
+Veículos leves já cadastrados no schema:
+  SMC7D44, SLZ8I55, SMA6B13, AGH7924, OOH4A79, TMH8J55 (KWID)
+
+Veículos pesados e motos: cadastre na aba Cadastros do app.
+
+Prestadores (seed automático no schema):
+  L R BRAGA ME, OSMAR BORGES JUNIOR, MARCELO CHIYOJI SAITO,
+  ROCHA AUTO ELETRICA E BORRACHARIA LTDA, ANDREIA DA ROCHA SILVA,
+  ALEXSANDRO TEIXEIRA DA PAZ EIRELI - ME, INJETORA DIESEL BATAGUASSU LTDA,
+  ROMERA E SANTANA SERVICOS LTDA, SAN JOSE EQUIPAMENTOS PARA AUTOS LTDA - ME,
+  SILVA & CIA LTDA, VANUZA CORREA DOS SANTOS PEREIRA,
+  RITA DE CASSIA MARQUES DE SOUZA PAIAO, SMS ELETRO DIESEL E ELETRICA LTDA,
+  JOAO PAULO DA SILVA LIMA
+
+Mecânico responsável: Andre Luis Brito Gomes (custo/hora na aba Cadastros)
