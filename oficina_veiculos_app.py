@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import date, datetime
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -15,6 +15,8 @@ TZ_BR = ZoneInfo("America/Sao_Paulo")
 SCHEMA = "oficina_veiculos"
 MECANICO_PADRAO = "ANDRE LUIS BRITO GOMES"
 PRESTADOR_INTERNO = "OFICINA INTERNA — SV"
+
+ITENS_FINANCEIRO = ["PECAS", "TROCA DE OLEO", "M.O. MECANICO", "OUTROS"]
 
 TIPOS_SERVICO = [
     "ELETRICO",
@@ -84,7 +86,8 @@ div[data-testid="stRadio"] label,div[data-testid="stRadio"] p{
  text-transform:uppercase;letter-spacing:1px;font-size:12px!important;}
 div[data-testid="stRadio"] div[role="radiogroup"] p{
  color:#e8edd0!important;font-size:14px!important;text-transform:none;}
-.stTextInput input,.stNumberInput input,.stTextArea textarea{
+.stTextInput input,.stNumberInput input,.stTextArea textarea,
+[data-testid="stDateInput"] input{
  background:#dce6d2!important;color:#1a2818!important;
  border:1px solid #4a6644!important;border-radius:8px!important;}
 .stTextInput input:focus,.stNumberInput input:focus,.stTextArea textarea:focus{
@@ -592,6 +595,325 @@ def render_cadastros(sb: Client):
         )
 
 
+def fmt_moeda(v) -> str:
+    try:
+        return f"R$ {float(v):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except (TypeError, ValueError):
+        return "R$ 0,00"
+
+
+def dark_table_fin(df: pd.DataFrame, height: int = 280):
+    if df.empty:
+        st.info("Nenhum registro.")
+        return
+    rows = "".join(
+        "<tr>"
+        + "".join(
+            f'<td style="padding:6px 10px;border-bottom:1px solid #1e2e1c;'
+            f'color:#e8edd0;font-size:12px;white-space:nowrap;">{v}</td>'
+            for v in row
+        )
+        + "</tr>"
+        for _, row in df.iterrows()
+    )
+    headers = "".join(
+        f'<th style="padding:7px 10px;background:#111c10;color:#9ab892;font-size:10px;'
+        f'font-weight:700;text-transform:uppercase;letter-spacing:1px;'
+        f'border-bottom:2px solid #1e2e1c;">{c}</th>'
+        for c in df.columns
+    )
+    st.markdown(
+        f'<div style="overflow-x:auto;border:1px solid #1e2e1c;border-radius:10px;">'
+        f'<div style="max-height:{height}px;overflow-y:auto;">'
+        f'<table style="width:100%;border-collapse:collapse;background:rgba(13,24,12,0.88);'
+        f'font-family:Barlow Condensed,sans-serif;"><thead><tr>{headers}</tr></thead>'
+        f'<tbody>{rows}</tbody></table></div></div>',
+        unsafe_allow_html=True,
+    )
+
+
+@st.cache_data(ttl=10)
+def carregar_financeiro_custos(limit: int = 500):
+    sb = get_supabase()
+    res = (
+        tbl(sb, "financeiro_custos")
+        .select("*")
+        .order("data", desc=True)
+        .order("criado_em", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return res.data or []
+
+
+@st.cache_data(ttl=15)
+def carregar_os_para_financeiro():
+    sb = get_supabase()
+    res = (
+        tbl(sb, "ordens_servico")
+        .select(
+            "id, numero_os, placa, modelo, categoria_veiculo, mecanico, "
+            "tipo_servico, tempo_min, status, hora_entrada, hora_saida"
+        )
+        .order("created_at", desc=True)
+        .limit(200)
+        .execute()
+    )
+    return res.data or []
+
+
+def lancamentos_do_dia(rows: list, data_ref: date) -> list:
+    data_str = str(data_ref)
+    return [r for r in rows if str(r.get("data", ""))[:10] == data_str]
+
+
+def custo_map_mecanicos() -> dict[str, float]:
+    return {
+        m["nome"]: float(m.get("custo_hora") or 0)
+        for m in carregar_mecanicos()
+    }
+
+
+def calcular_mo_mecanico(os_row: dict) -> tuple[int, float, float]:
+    tempo = int(os_row.get("tempo_min") or 0)
+    if tempo <= 0:
+        he, hs = os_row.get("hora_entrada"), os_row.get("hora_saida")
+        if he and hs:
+            tempo = calc_tempo_min(str(he), str(hs)) or 0
+    custo_h = custo_map_mecanicos().get(os_row.get("mecanico", ""), 0.0)
+    custo_mo = round((tempo / 60) * custo_h, 2) if tempo and custo_h else 0.0
+    return tempo, custo_h, custo_mo
+
+
+def label_os_fin(o: dict) -> str:
+    cat = o.get("categoria_veiculo", "")
+    placa = o.get("placa", "")
+    if cat in ("PESADO", "MOTO") and o.get("modelo"):
+        veic = f"{placa} - {o['modelo']}"
+    else:
+        veic = placa
+    return f"{o['numero_os']} | {veic} | {o.get('tipo_servico', '')} | {o.get('status', '')}"
+
+
+def render_financeiro(sb: Client):
+    st.markdown(
+        '<div class="sec">💰 Lançamentos financeiros — custo veículos</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Peças, troca de óleo e M.O. do mecânico (hora parada). "
+        "Sem hora de operador — leves e motos permanecem na adm."
+    )
+
+    lancamentos = carregar_financeiro_custos()
+    os_list = carregar_os_para_financeiro()
+
+    st.markdown('<div class="sec">Resumo do dia</div>', unsafe_allow_html=True)
+    fc1, fc2, fc3 = st.columns([2, 1, 1])
+    with fc1:
+        filtro_data = st.date_input(
+            "Filtrar por data",
+            value=date.today(),
+            format="DD/MM/YYYY",
+            key="fin_data_filtro",
+        )
+    lanc_dia = lancamentos_do_dia(lancamentos, filtro_data)
+    total_dia = sum(float(l.get("valor") or 0) for l in lanc_dia)
+    with fc2:
+        st.metric("Total do dia", fmt_moeda(total_dia))
+    with fc3:
+        st.metric("Lançamentos", len(lanc_dia))
+
+    if not os_list:
+        st.warning("Cadastre e finalize OS antes de lançar custos.")
+        return
+
+    st.markdown('<div class="sec">Novo lançamento vinculado à OS</div>', unsafe_allow_html=True)
+
+    opcoes_os = [label_os_fin(o) for o in os_list]
+    os_map = {label_os_fin(o): o for o in os_list}
+    os_sel_label = st.selectbox("Selecione a OS", options=opcoes_os, key="fin_os_sel")
+    os_sel = os_map[os_sel_label]
+
+    tempo_min, custo_h, custo_mo = calcular_mo_mecanico(os_sel)
+    k1, k2, k3, k4 = st.columns(4)
+    k1.metric("OS", os_sel.get("numero_os", "—"))
+    k2.metric("Placa / Frota", os_sel.get("placa", "—"))
+    k3.metric("Tempo mecânico", f"{tempo_min} min")
+    k4.metric("M.O. mecânico (calc.)", fmt_moeda(custo_mo))
+
+    if custo_h <= 0:
+        st.info(
+            "Cadastre o **custo/hora** do mecânico na aba Cadastros para calcular a M.O. automaticamente."
+        )
+
+    with st.form("form_fin_veiculos", clear_on_submit=True):
+        r1a, r1b, r1c = st.columns(3)
+        with r1a:
+            data_lanc = st.date_input("📅 Data *", value=date.today(), format="DD/MM/YYYY")
+        with r1b:
+            nfe = st.text_input("🧾 NFE")
+        with r1c:
+            id_fornecedor = st.text_input("🏭 ID Fornecedor SAP")
+
+        r2a, r2b, r2c = st.columns(3)
+        with r2a:
+            item = st.selectbox("📦 Item *", options=ITENS_FINANCEIRO)
+        with r2b:
+            tipo_manut = st.selectbox(
+                "🔧 Tipo de manutenção *",
+                options=TIPOS_SERVICO,
+                index=TIPOS_SERVICO.index(os_sel["tipo_servico"])
+                if os_sel.get("tipo_servico") in TIPOS_SERVICO
+                else 0,
+            )
+        with r2c:
+            if item == "M.O. MECANICO":
+                valor = st.number_input(
+                    "💰 Valor M.O. mecânico (R$) *",
+                    min_value=0.0,
+                    step=0.01,
+                    format="%.2f",
+                    value=float(custo_mo),
+                    help="Calculado: tempo da OS × custo/hora do mecânico.",
+                )
+            else:
+                valor = st.number_input("💰 Valor (R$) *", min_value=0.0, step=0.01, format="%.2f")
+
+        r3a, r3b = st.columns(2)
+        with r3a:
+            descricao_peca = st.text_input(
+                "Descrição (peça / serviço)",
+                placeholder="Ex: Filtro de óleo, pastilha de freio…",
+            )
+        with r3b:
+            observacao = st.text_area("💬 Observação", height=68)
+
+        if item == "PECAS":
+            rq1, rq2 = st.columns(2)
+            with rq1:
+                quantidade = st.number_input("Quantidade", min_value=0.01, step=1.0, format="%.2f", value=1.0)
+            with rq2:
+                valor_unit = st.number_input(
+                    "Valor unitário (R$)",
+                    min_value=0.0,
+                    step=0.01,
+                    format="%.2f",
+                    value=float(valor),
+                )
+        else:
+            quantidade = 1.0
+            valor_unit = float(valor)
+
+        enviar = st.form_submit_button("✅ Salvar lançamento", use_container_width=True)
+
+    if enviar:
+        if item == "M.O. MECANICO" and tempo_min <= 0:
+            st.warning("A OS não possui tempo de mecânico (hora entrada/saída). Informe na OS ou use outro item.")
+        elif item != "M.O. MECANICO" and valor <= 0:
+            st.warning("Informe um valor maior que zero.")
+        elif item == "M.O. MECANICO" and valor <= 0:
+            st.warning("Valor M.O. zerado — cadastre custo/hora do mecânico.")
+        else:
+            val_final = round(float(valor), 2)
+            qtd_final = float(quantidade)
+            if item == "PECAS" and valor_unit > 0:
+                val_final = round(valor_unit * qtd_final, 2)
+
+            payload = {
+                "os_id": os_sel.get("id"),
+                "numero_os": os_sel["numero_os"],
+                "data": str(data_lanc),
+                "categoria_veiculo": os_sel["categoria_veiculo"],
+                "placa": os_sel["placa"],
+                "mecanico": os_sel.get("mecanico"),
+                "item": item,
+                "tipo_manutencao": tipo_manut,
+                "descricao_peca": descricao_peca.strip() or None,
+                "nfe": nfe.strip() or None,
+                "id_fornecedor_sap": id_fornecedor.strip() or None,
+                "quantidade": qtd_final,
+                "valor_unitario": round(float(valor_unit), 2) if item == "PECAS" else None,
+                "valor": val_final,
+                "tempo_min_mecanico": tempo_min if item == "M.O. MECANICO" else None,
+                "custo_hora_mecanico": custo_h if item == "M.O. MECANICO" else None,
+                "custo_mo_mecanico": val_final if item == "M.O. MECANICO" else None,
+                "observacao": observacao.strip() or None,
+            }
+            try:
+                tbl(sb, "financeiro_custos").insert(payload).execute()
+                st.success(f"Lançamento salvo — {item} | {fmt_moeda(val_final)}")
+                st.cache_data.clear()
+                st.rerun()
+            except Exception as exc:
+                st.error(f"Erro ao salvar: {exc}")
+
+    st.markdown(
+        f'<div class="sec">Lançamentos em {filtro_data.strftime("%d/%m/%Y")}</div>',
+        unsafe_allow_html=True,
+    )
+    lanc_dia = lancamentos_do_dia(carregar_financeiro_custos(), filtro_data)
+    if lanc_dia:
+        df = pd.DataFrame(lanc_dia)
+        show = df[
+            [
+                c
+                for c in [
+                    "numero_os",
+                    "placa",
+                    "item",
+                    "tipo_manutencao",
+                    "descricao_peca",
+                    "valor",
+                    "nfe",
+                ]
+                if c in df.columns
+            ]
+        ].copy()
+        if "valor" in show.columns:
+            show["valor"] = show["valor"].apply(fmt_moeda)
+        show = show.rename(
+            columns={
+                "numero_os": "OS",
+                "placa": "Placa",
+                "item": "Item",
+                "tipo_manutencao": "Tipo",
+                "descricao_peca": "Descrição",
+                "valor": "Valor",
+                "nfe": "NFE",
+            }
+        )
+        dark_table_fin(show, height=260)
+
+        st.markdown('<div class="sec">Custo acumulado por OS (com M.O. mecânico)</div>', unsafe_allow_html=True)
+        try:
+            resumo = tbl(sb, "v_custo_os_resumo").select("*").order("custo_total", desc=True).limit(20).execute()
+            if resumo.data:
+                df_r = pd.DataFrame(resumo.data)
+                for col in ("custo_pecas", "custo_oleo", "custo_mo_mecanico", "custo_outros", "custo_total"):
+                    if col in df_r.columns:
+                        df_r[col] = df_r[col].apply(fmt_moeda)
+                dark_table_fin(
+                    df_r.rename(
+                        columns={
+                            "numero_os": "OS",
+                            "categoria_veiculo": "Cat.",
+                            "placa": "Placa",
+                            "custo_pecas": "Peças",
+                            "custo_oleo": "Óleo",
+                            "custo_mo_mecanico": "M.O. Mec.",
+                            "custo_outros": "Outros",
+                            "custo_total": "Total",
+                        }
+                    ),
+                    height=220,
+                )
+        except Exception:
+            pass
+    else:
+        st.info("Nenhum lançamento nesta data.")
+
+
 # ── App principal ───────────────────────────────────────────────────────────
 exigir_acesso("Ordem de Serviço — Oficina Veículos", "SIGCF | Controladoria — Gestão e Análise de Dados")
 st.markdown(CSS.replace("__BG__", BG_URL), unsafe_allow_html=True)
@@ -619,9 +941,10 @@ except Exception as exc:
     st.error(f"Configure SUPABASE_URL e SUPABASE_KEY nos Secrets. Erro: {exc}")
     st.stop()
 
-aba_lanc, aba_edit, aba_painel, aba_cad = st.tabs([
+aba_lanc, aba_edit, aba_fin, aba_painel, aba_cad = st.tabs([
     "📝 Nova OS",
     "✏️ Editar OS Pendente",
+    "💰 Financeiro",
     "📊 Painel",
     "⚙️ Cadastros",
 ])
@@ -664,6 +987,9 @@ with aba_edit:
             f"{CATEGORIAS.get(cat_os, cat_os)}"
         )
         render_formulario_os(sb, cat_os, modo_edicao=True, os_existente=os_sel)
+
+with aba_fin:
+    render_financeiro(sb)
 
 with aba_painel:
     render_painel()
