@@ -20,12 +20,12 @@ def logo_html(width: int = 120) -> str:
     if LOGO_FILE.is_file():
         b64 = base64.b64encode(LOGO_FILE.read_bytes()).decode()
         src = f"data:image/png;base64,{b64}"
-        return (
-            f'<img src="{src}" width="{width}" alt="Santa Virgínia" '
-            f'style="border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,.5);display:block;">'
-        )
-    src = LOGO_URL
-    return f'<div class="logo-frame"><img src="{src}" width="{width}" alt="Santa Virgínia"></div>'
+    else:
+        src = LOGO_URL
+    return (
+        f'<div class="logo-frame"><img src="{src}" width="{width}" '
+        f'alt="Santa Virgínia"></div>'
+    )
 
 
 def link_instagram(text: str = "@fazendasantaverginia") -> str:

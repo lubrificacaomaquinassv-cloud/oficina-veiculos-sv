@@ -48,7 +48,7 @@ CSS = """
 [data-testid="stAppViewContainer"]{background:transparent!important;}
 [data-testid="stSidebar"]{display:none;}
 [data-testid="stHeader"]{background:rgba(10,20,9,0.45)!important;}
-.block-container{background:transparent!important;max-width:1100px!important;}
+.block-container{background:transparent!important;max-width:1240px!important;padding-top:1rem!important;}
 h1,h2,h3,h4,p,span,label{color:#e8edd0;}
 h1{font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;}
 .stCaption,[data-testid="stCaptionContainer"] p{color:#9ab892!important;}
@@ -61,7 +61,17 @@ h1{font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;}
 .insta-ico{width:17px;height:17px;flex-shrink:0;}
 div[data-testid="stForm"]{
  background:rgba(13,24,12,0.88)!important;border:1px solid #2a3d28!important;
- border-radius:12px;padding:24px;}
+ border-radius:14px;padding:20px 22px;}
+.os-badge{display:inline-flex;flex-direction:column;align-items:flex-start;
+ background:rgba(13,24,12,0.92);border:2px solid #5a9452;border-radius:12px;
+ padding:8px 20px;margin-bottom:4px;}
+.os-badge-lbl{font-family:'Barlow Condensed',sans-serif;font-size:10px;color:#9ab892;
+ letter-spacing:2px;text-transform:uppercase;font-weight:700;}
+.os-badge-num{font-family:'Barlow Condensed',sans-serif;font-size:26px;font-weight:700;
+ color:#8ec486;line-height:1.15;letter-spacing:1px;}
+.ctx-bar{background:rgba(13,24,12,0.72);border:1px solid #2a3d28;border-radius:10px;
+ padding:8px 14px;margin:0 0 14px;}
+.form-spacer{height:4px;}
 div[data-testid="stSelectbox"] label,div[data-testid="stNumberInput"] label,
 div[data-testid="stTextArea"] label,div[data-testid="stTextInput"] label,
 div[data-testid="stRadio"] label,div[data-testid="stRadio"] p{
@@ -240,6 +250,13 @@ def carregar_painel():
     return resumo[0], prest, tipos
 
 
+def opcao_veiculo(v: dict, categoria: str) -> str:
+    """Leve: só placa. Pesado/Moto: frota - modelo para identificação."""
+    if categoria == "LEVE":
+        return str(v["placa"])
+    return f"{v['placa']} - {v['modelo']}"
+
+
 def render_tabela_os(rows: list[dict], limite: int = 15):
     if not rows:
         st.info("Nenhuma OS registrada.")
@@ -293,36 +310,39 @@ def render_formulario_os(
             "Use a aba Cadastros para incluir."
         )
 
-    placas = [v["placa"] for v in veiculos] or ["—"]
-    veic_map = {v["placa"]: v for v in veiculos}
+    opcoes_veic = [opcao_veiculo(v, categoria) for v in veiculos] or ["—"]
+    veic_map = {opcao_veiculo(v, categoria): v for v in veiculos}
     placa_default = defaults.get("placa", "")
-    idx_veic = placas.index(placa_default) if placa_default in placas else 0
+    idx_veic = next(
+        (i for i, v in enumerate(veiculos) if v["placa"] == placa_default),
+        0,
+    )
 
     with st.form("form_os_veiculos", clear_on_submit=not modo_edicao):
-        col_os, _ = st.columns([1, 3])
-        with col_os:
-            st.metric("O.S. ATUAL", numero_os)
+        st.markdown(
+            f'<div class="os-badge"><span class="os-badge-lbl">O.S. ATUAL</span>'
+            f'<span class="os-badge-num">{numero_os}</span></div>',
+            unsafe_allow_html=True,
+        )
 
-        c1, c2 = st.columns(2)
-
-        with c1:
-            veic_sel = st.selectbox("Selecione o Veículo", options=placas, index=idx_veic)
+        r1a, r1b, r1c = st.columns([2.2, 1.4, 1.4])
+        with r1a:
+            veic_sel = st.selectbox("Selecione o Veículo", options=opcoes_veic, index=idx_veic)
+        with r1b:
             mec_idx = nomes_mecanicos.index(defaults["mecanico"]) if defaults.get("mecanico") in nomes_mecanicos else (
                 nomes_mecanicos.index(MECANICO_PADRAO) if MECANICO_PADRAO in nomes_mecanicos else 0
             )
             mecanico = st.selectbox("Mecânico", options=nomes_mecanicos, index=mec_idx)
+        with r1c:
             tipo_idx = TIPOS_SERVICO.index(defaults["tipo_servico"]) if defaults.get("tipo_servico") in TIPOS_SERVICO else 0
             tipo_servico = st.selectbox("Tipo de Serviço", options=TIPOS_SERVICO, index=tipo_idx)
+
+        r2a, r2b, r2c = st.columns([2, 1, 1.2])
+        with r2a:
             prest_default = defaults.get("prestador_nome") or PRESTADOR_INTERNO
             prest_idx = opcoes_prestador.index(prest_default) if prest_default in opcoes_prestador else 0
             prestador_sel = st.selectbox("Prestador de Serviço", options=opcoes_prestador, index=prest_idx)
-            operador = st.text_input(
-                "Operador (apontado no equipamento)",
-                value=defaults.get("operador") or "",
-                placeholder="Digite o nome do operador",
-            )
-
-        with c2:
+        with r2b:
             horimetro = st.number_input(
                 "Horímetro ou KM Atual",
                 min_value=0.0,
@@ -330,39 +350,55 @@ def render_formulario_os(
                 format="%.1f",
                 value=float(defaults.get("horimetro_km") or 0.0),
             )
+        with r2c:
+            operador = st.text_input(
+                "Operador (apontado no equipamento)",
+                value=defaults.get("operador") or "",
+                placeholder="Nome do operador",
+            )
+
+        r3a, r3b, r3c = st.columns([1, 1, 1.2])
+        with r3a:
             hora_entrada_txt = st.text_input(
                 "Hora Entrada",
                 value=defaults.get("hora_entrada") or "",
                 placeholder="Ex: 08:30",
             )
+        with r3b:
             hora_saida_txt = st.text_input(
                 "Hora Saída",
                 value=defaults.get("hora_saida") or "",
                 placeholder="Ex: 14:30",
             )
+        with r3c:
             status_default = defaults.get("status", "PENDENTE")
             status_idx = 0 if status_default == "FINALIZADO" else 1
             status_os = st.radio("Status", ["FINALIZADO", "PENDENTE"], horizontal=True, index=status_idx)
 
-            odometro_ultima = st.number_input(
-                "Odômetro da Última Troca de Óleo",
-                min_value=0.0,
-                step=0.1,
-                format="%.1f",
-                value=float(defaults.get("odometro_ultima_troca") or 0.0),
-                help="Obrigatório quando o tipo de serviço for TROCA DE OLEO.",
-            )
+        odometro_ultima = st.number_input(
+            "Odômetro da Última Troca de Óleo",
+            min_value=0.0,
+            step=0.1,
+            format="%.1f",
+            value=float(defaults.get("odometro_ultima_troca") or 0.0),
+            help="Obrigatório quando o tipo de serviço for TROCA DE OLEO.",
+        )
 
-        descricao = st.text_area(
-            "Descrição do Serviço e Peças Aplicadas",
-            value=defaults.get("descricao") or "",
-            max_chars=500,
-        )
-        observacao = st.text_area(
-            "Observação",
-            value=defaults.get("observacao") or "",
-            max_chars=300,
-        )
+        r4a, r4b = st.columns(2)
+        with r4a:
+            descricao = st.text_area(
+                "Descrição do Serviço e Peças Aplicadas",
+                value=defaults.get("descricao") or "",
+                max_chars=500,
+                height=120,
+            )
+        with r4b:
+            observacao = st.text_area(
+                "Observação",
+                value=defaults.get("observacao") or "",
+                max_chars=300,
+                height=120,
+            )
 
         label_btn = "✅ ATUALIZAR OS" if modo_edicao else "✅ SALVAR NO SISTEMA"
         enviar = st.form_submit_button(label_btn)
@@ -555,9 +591,9 @@ def render_cadastros(sb: Client):
 exigir_acesso("Ordem de Serviço — Oficina Veículos", "SIGCF | Controladoria — Gestão e Análise de Dados")
 st.markdown(CSS.replace("__BG__", BG_URL), unsafe_allow_html=True)
 
-col_logo, col_titulo = st.columns([1.1, 5.9])
+col_logo, col_titulo, col_btn = st.columns([1.1, 4.9, 1])
 with col_logo:
-    st.markdown(logo_html(118), unsafe_allow_html=True)
+    st.markdown(logo_html(120), unsafe_allow_html=True)
 with col_titulo:
     st.title("🔧 ORDEM DE SERVIÇO — OFICINA VEÍCULOS")
     st.caption("SIGCF | CONTROLADORIA — GESTÃO E ANÁLISE DE DADOS · Leve · Pesado · Moto")
@@ -565,6 +601,10 @@ with col_titulo:
         f'<p style="margin:4px 0 0;font-size:13px;">{link_instagram()}</p>',
         unsafe_allow_html=True,
     )
+with col_btn:
+    if st.button("🔄 Atualizar"):
+        st.cache_data.clear()
+        st.rerun()
 
 st.divider()
 
@@ -582,14 +622,23 @@ aba_lanc, aba_edit, aba_painel, aba_cad = st.tabs([
 ])
 
 with aba_lanc:
-    categoria_nova = st.selectbox(
-        "Categoria do Veículo",
-        options=list(CATEGORIAS.keys()),
-        format_func=lambda x: CATEGORIAS[x],
-        key="os_categoria_nova",
-    )
-    qtd = len(carregar_veiculos(categoria_nova))
-    st.caption(f"{qtd} veículo(s) disponível(is) nesta categoria")
+    st.markdown('<div class="sec">Nova ordem de serviço</div>', unsafe_allow_html=True)
+    cat_col, info_col = st.columns([1.6, 2.4])
+    with cat_col:
+        categoria_nova = st.selectbox(
+            "Categoria do Veículo",
+            options=list(CATEGORIAS.keys()),
+            format_func=lambda x: CATEGORIAS[x],
+            key="os_categoria_nova",
+        )
+    with info_col:
+        qtd = len(carregar_veiculos(categoria_nova))
+        st.markdown(
+            f'<div class="ctx-bar" style="margin-top:28px;">'
+            f'<span style="color:#9ab892;font-size:12px;">{qtd} veículo(s) em '
+            f'{CATEGORIAS[categoria_nova]}</span></div>',
+            unsafe_allow_html=True,
+        )
     render_formulario_os(sb, categoria_nova, modo_edicao=False)
 
 with aba_edit:
