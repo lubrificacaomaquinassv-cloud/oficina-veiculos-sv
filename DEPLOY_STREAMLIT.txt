@@ -1,18 +1,16 @@
 OFICINA VEÍCULOS — Deploy Streamlit Cloud
 ==========================================
 
-1) GITHUB
-   Crie repositório (ex: oficina-veiculos-sv) e envie a pasta OFICINA_VEICULOS.
-   Ou subpasta no repo borracharia apontando Main file para OFICINA_VEICULOS/oficina_veiculos_app.py
+1) GITHUB — CONCLUÍDO
+   https://github.com/lubrificacaomaquinassv-cloud/oficina-veiculos-sv
 
-2) SCHEMA SUPABASE (obrigatório antes do deploy)
-   SQL Editor → execute sql/001_oficina_veiculos_schema.sql
-   Depois sql/002_reload_postgrest_schema.sql
-   Settings > API > Exposed schemas → adicionar "oficina_veiculos"
+2) SCHEMA SUPABASE — CONCLUÍDO (aplicado + exposto na API)
+   Schema: oficina_veiculos
+   Verificar local: python verificar_instalacao.py
 
-3) STREAMLIT CLOUD
+3) STREAMLIT CLOUD (faça uma vez)
    share.streamlit.io → Create app
-   Repository: seu repo GitHub
+   Repository: lubrificacaomaquinassv-cloud/oficina-veiculos-sv
    Branch: main
    Main file: oficina_veiculos_app.py
    Advanced settings → Python version: 3.12
