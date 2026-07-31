@@ -9,7 +9,7 @@ import pandas as pd
 import streamlit as st
 from supabase import Client, create_client
 
-from sigcf_auth import exigir_acesso, logo_html
+from sigcf_auth import BG_URL, exigir_acesso, link_instagram, logo_html
 
 TZ_BR = ZoneInfo("America/Sao_Paulo")
 SCHEMA = "oficina_veiculos"
@@ -42,53 +42,75 @@ st.set_page_config(
 CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700&display=swap');
-[data-testid="stAppViewContainer"]{background:#0a1409;}
+.stApp{
+ background:linear-gradient(rgba(10,20,9,0.68),rgba(10,20,9,0.82)),
+ url('__BG__') center center/cover no-repeat fixed!important;}
+[data-testid="stAppViewContainer"]{background:transparent!important;}
 [data-testid="stSidebar"]{display:none;}
-[data-testid="stHeader"]{background:#0a1409;}
+[data-testid="stHeader"]{background:rgba(10,20,9,0.45)!important;}
+.block-container{background:transparent!important;max-width:1100px!important;}
 h1,h2,h3,h4,p,span,label{color:#e8edd0;}
 h1{font-family:'Barlow Condensed',sans-serif;letter-spacing:1px;}
-.stCaption,[data-testid="stCaptionContainer"] p{color:#8aab80!important;}
+.stCaption,[data-testid="stCaptionContainer"] p{color:#9ab892!important;}
 .logo-frame{background:linear-gradient(145deg,#0a1628,#0d2040);border:2px solid #c9a227;
  border-radius:12px;padding:5px;display:inline-block;box-shadow:0 4px 18px rgba(0,0,0,.45);}
 .logo-frame img{display:block;border-radius:8px;}
-div[data-testid="stForm"]{background:#0d180c;border:1px solid #1e2e1c;border-radius:12px;padding:24px;}
+.insta-link{display:inline-flex;align-items:center;gap:6px;color:#8ec486!important;
+ text-decoration:none;font-weight:600;}
+.insta-link:hover{color:#a8d8a0!important;text-decoration:none;}
+.insta-ico{width:17px;height:17px;flex-shrink:0;}
+div[data-testid="stForm"]{
+ background:rgba(13,24,12,0.88)!important;border:1px solid #2a3d28!important;
+ border-radius:12px;padding:24px;}
 div[data-testid="stSelectbox"] label,div[data-testid="stNumberInput"] label,
 div[data-testid="stTextArea"] label,div[data-testid="stTextInput"] label,
 div[data-testid="stRadio"] label,div[data-testid="stRadio"] p{
- color:#8aab80!important;font-family:'Barlow Condensed',sans-serif;
+ color:#9ab892!important;font-family:'Barlow Condensed',sans-serif;
  text-transform:uppercase;letter-spacing:1px;font-size:12px!important;}
 div[data-testid="stRadio"] div[role="radiogroup"] p{
  color:#e8edd0!important;font-size:14px!important;text-transform:none;}
 .stTextInput input,.stNumberInput input,.stTextArea textarea{
  background:#dce6d2!important;color:#1a2818!important;
  border:1px solid #4a6644!important;border-radius:8px!important;}
+.stTextInput input:focus,.stNumberInput input:focus,.stTextArea textarea:focus{
+ border-color:#6fcf60!important;box-shadow:0 0 0 1px #6fcf6044!important;}
 div[data-baseweb="select"] > div{
  background:#dce6d2!important;border:1px solid #4a6644!important;
  color:#1a2818!important;border-radius:8px!important;}
+div[data-baseweb="select"] div{color:#1a2818!important;}
+div[data-baseweb="select"] svg{fill:#4a6644!important;}
+ul[data-testid="stSelectboxVirtualDropdown"],div[data-baseweb="popover"] ul{background:#e8edd0!important;}
+div[data-baseweb="popover"] li{color:#1a2818!important;}
 .stNumberInput button{background:#cdd9c4!important;color:#1a2818!important;border:1px solid #4a6644!important;}
 div[data-testid="stMetric"],div[data-testid="metric-container"]{
- background:#0d180c;border:1px solid #4a9e3f;border-radius:10px;padding:12px 18px;}
-div[data-testid="stMetric"] label{color:#8aab80!important;}
-div[data-testid="stMetricValue"]{color:#6fcf60!important;font-family:'Barlow Condensed',sans-serif;}
+ background:rgba(13,24,12,0.88);border:1px solid #2a3d28;border-radius:10px;padding:12px 18px;}
+div[data-testid="stMetric"] label{color:#9ab892!important;}
+div[data-testid="stMetricValue"]{color:#8ec486!important;font-family:'Barlow Condensed',sans-serif;}
 .stButton button,[data-testid="stFormSubmitButton"] button{
- background:#4a9e3f!important;color:#ffffff!important;border:1px solid #6fcf60!important;
+ background:#4a9e3f!important;color:#ffffff!important;border:1px solid #6fa864!important;
  font-family:'Barlow Condensed',sans-serif;font-weight:700;letter-spacing:1.5px;
- text-transform:uppercase;border-radius:8px;padding:10px 28px;}
+ text-transform:uppercase;border-radius:8px;min-height:44px;padding:10px 28px;}
 .stButton button:hover,[data-testid="stFormSubmitButton"] button:hover{background:#3d8534!important;}
+.stButton button p,[data-testid="stFormSubmitButton"] button p{color:#ffffff!important;font-weight:700;}
 .sec{font-family:'Barlow Condensed',sans-serif;font-size:12px;font-weight:700;
- letter-spacing:2px;text-transform:uppercase;color:#8aab80;
- border-left:4px solid #4a9e3f;padding-left:10px;margin:4px 0 10px;}
-.os-table{width:100%;border-collapse:collapse;font-size:12px;}
-.os-table th{color:#8aab80;text-transform:uppercase;font-size:10px;letter-spacing:1px;
+ letter-spacing:2px;text-transform:uppercase;color:#9ab892;
+ border-left:4px solid #5a9452;padding-left:10px;margin:8px 0 12px;}
+.os-table{width:100%;border-collapse:collapse;font-size:12px;background:rgba(13,24,12,0.88);}
+.os-table th{color:#9ab892;text-transform:uppercase;font-size:10px;letter-spacing:1px;
  text-align:left;padding:6px 8px;border-bottom:1px solid #1e2e1c;font-family:'Barlow Condensed',sans-serif;}
 .os-table td{color:#e8edd0;padding:6px 8px;border-bottom:1px solid #16241480;}
-.st-fin{color:#6fcf60;font-weight:700;}
+.st-fin{color:#8ec486;font-weight:700;}
 .st-pend{color:#d4a017;font-weight:700;}
-.stTabs [data-baseweb="tab-list"]{gap:0;border-bottom:1px solid #1e2e1c;}
+.stTabs [data-baseweb="tab-list"]{background:rgba(13,24,12,0.88);border-bottom:1px solid #2a3d28;gap:8px;}
 .stTabs [data-baseweb="tab"]{
- color:#8aab80!important;font-family:'Barlow Condensed',sans-serif;
+ color:#9ab892!important;font-family:'Barlow Condensed',sans-serif;
  font-size:15px;font-weight:600;background:transparent!important;}
-.stTabs [aria-selected="true"]{color:#e8edd0!important;border-bottom:3px solid #4a9e3f!important;}
+.stTabs [aria-selected="true"]{color:#e8edd0!important;border-bottom-color:#5a9452!important;}
+.stTabs [data-baseweb="tab-highlight"]{background-color:#5a9452!important;}
+@media (max-width:768px){
+ .block-container{padding-left:0.75rem!important;padding-right:0.75rem!important;}
+ div[data-testid="stHorizontalBlock"]{flex-wrap:wrap!important;}
+}
 </style>
 """
 
@@ -213,6 +235,9 @@ def carregar_painel():
 
 
 def label_veiculo(v: dict) -> str:
+    cat = v.get("categoria", "")
+    if cat == "PESADO":
+        return f"{v['placa']} - {v['modelo']}"
     return f"{v['placa']} — {v['modelo']}"
 
 
@@ -546,7 +571,7 @@ def render_cadastros(sb: Client):
 
 # ── App principal ───────────────────────────────────────────────────────────
 exigir_acesso("Ordem de Serviço — Oficina Veículos", "SIGCF | Controladoria — Gestão e Análise de Dados")
-st.markdown(CSS, unsafe_allow_html=True)
+st.markdown(CSS.replace("__BG__", BG_URL), unsafe_allow_html=True)
 
 col_logo, col_titulo = st.columns([1.1, 5.9])
 with col_logo:
@@ -554,6 +579,10 @@ with col_logo:
 with col_titulo:
     st.title("🔧 ORDEM DE SERVIÇO — OFICINA VEÍCULOS")
     st.caption("SIGCF | CONTROLADORIA — GESTÃO E ANÁLISE DE DADOS · Leve · Pesado · Moto")
+    st.markdown(
+        f'<p style="margin:4px 0 0;font-size:13px;">{link_instagram()}</p>',
+        unsafe_allow_html=True,
+    )
 
 st.divider()
 

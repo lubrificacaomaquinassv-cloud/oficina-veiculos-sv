@@ -15,7 +15,9 @@ with open(ROOT / ".streamlit" / "secrets.toml", "rb") as f:
     secrets = tomllib.load(f)
 
 sb = create_client(secrets["SUPABASE_URL"], secrets["SUPABASE_KEY"])
-veiculos = sb.schema("oficina_veiculos").from_("veiculos").select("placa,modelo").limit(6).execute()
+veiculos = sb.schema("oficina_veiculos").from_("veiculos").select("placa,modelo,categoria").eq("ativo", True).order("categoria").order("placa").execute()
 prest = sb.schema("oficina_veiculos").from_("prestadores").select("nome").execute()
 mec = sb.schema("oficina_veiculos").from_("mecanicos").select("nome,responsavel").execute()
-print(f"OK — {len(veiculos.data)} veiculos, {len(prest.data)} prestadores, {len(mec.data)} mecanicos")
+leves = [v for v in veiculos.data if v["categoria"] == "LEVE"]
+pesados = [v for v in veiculos.data if v["categoria"] == "PESADO"]
+print(f"OK — {len(leves)} leves, {len(pesados)} pesados, {len(prest.data)} prestadores, {len(mec.data)} mecanicos")
