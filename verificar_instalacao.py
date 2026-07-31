@@ -20,4 +20,5 @@ prest = sb.schema("oficina_veiculos").from_("prestadores").select("nome").execut
 mec = sb.schema("oficina_veiculos").from_("mecanicos").select("nome,responsavel").execute()
 leves = [v for v in veiculos.data if v["categoria"] == "LEVE"]
 pesados = [v for v in veiculos.data if v["categoria"] == "PESADO"]
-print(f"OK — {len(leves)} leves, {len(pesados)} pesados, {len(prest.data)} prestadores, {len(mec.data)} mecanicos")
+motos = [v for v in veiculos.data if v["categoria"] == "MOTO"]
+print(f"OK — {len(leves)} leves, {len(pesados)} pesados, {len(motos)} motos, {len(prest.data)} prestadores")

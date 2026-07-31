@@ -177,12 +177,18 @@ def proximo_numero_os(sb: Client) -> str:
 
 
 @st.cache_data(ttl=30)
-def carregar_veiculos(categoria: str | None = None):
+def carregar_veiculos(categoria: str):
     sb = get_supabase()
-    q = tbl(sb, "veiculos").select("id, placa, modelo, categoria").eq("ativo", True).order("modelo")
-    if categoria:
-        q = q.eq("categoria", categoria)
-    return q.execute().data or []
+    return (
+        tbl(sb, "veiculos")
+        .select("id, placa, modelo, categoria")
+        .eq("ativo", True)
+        .eq("categoria", categoria)
+        .order("placa")
+        .execute()
+        .data
+        or []
+    )
 
 
 @st.cache_data(ttl=30)
@@ -234,13 +240,6 @@ def carregar_painel():
     return resumo[0], prest, tipos
 
 
-def label_veiculo(v: dict) -> str:
-    cat = v.get("categoria", "")
-    if cat == "PESADO":
-        return f"{v['placa']} - {v['modelo']}"
-    return f"{v['placa']} — {v['modelo']}"
-
-
 def render_tabela_os(rows: list[dict], limite: int = 15):
     if not rows:
         st.info("Nenhuma OS registrada.")
@@ -270,6 +269,7 @@ def render_tabela_os(rows: list[dict], limite: int = 15):
 
 def render_formulario_os(
     sb: Client,
+    categoria: str,
     *,
     modo_edicao: bool = False,
     os_existente: dict | None = None,
@@ -284,47 +284,29 @@ def render_formulario_os(
     prest_map = {p["nome"]: p["id"] for p in prestadores}
 
     defaults = os_existente or {}
-    cat_default = defaults.get("categoria_veiculo", "LEVE")
-    idx_cat = list(CATEGORIAS.keys()).index(cat_default) if cat_default in CATEGORIAS else 0
-
     numero_os = defaults.get("numero_os") or proximo_numero_os(sb)
+
+    veiculos = carregar_veiculos(categoria)
+    if not veiculos:
+        st.warning(
+            f"Nenhum veículo cadastrado em {CATEGORIAS[categoria]}. "
+            "Use a aba Cadastros para incluir."
+        )
+
+    placas = [v["placa"] for v in veiculos] or ["—"]
+    veic_map = {v["placa"]: v for v in veiculos}
+    placa_default = defaults.get("placa", "")
+    idx_veic = placas.index(placa_default) if placa_default in placas else 0
 
     with st.form("form_os_veiculos", clear_on_submit=not modo_edicao):
         col_os, _ = st.columns([1, 3])
         with col_os:
             st.metric("O.S. ATUAL", numero_os)
 
-        categoria = st.selectbox(
-            "Categoria do Veículo",
-            options=list(CATEGORIAS.keys()),
-            format_func=lambda x: CATEGORIAS[x],
-            index=idx_cat,
-            disabled=modo_edicao,
-        )
-
-        veiculos = carregar_veiculos(categoria)
-        if not veiculos:
-            st.warning(
-                f"Nenhum veículo cadastrado em {CATEGORIAS[categoria]}. "
-                "Use a aba Cadastros para incluir."
-            )
-            labels_veic = ["—"]
-            veic_map = {}
-        else:
-            labels_veic = [label_veiculo(v) for v in veiculos]
-            veic_map = {label_veiculo(v): v for v in veiculos}
-
-        placa_default = defaults.get("placa", "")
-        idx_veic = 0
-        for i, lbl in enumerate(labels_veic):
-            if placa_default and lbl.startswith(placa_default):
-                idx_veic = i
-                break
-
         c1, c2 = st.columns(2)
 
         with c1:
-            veic_sel = st.selectbox("Selecione o Veículo", options=labels_veic, index=idx_veic)
+            veic_sel = st.selectbox("Selecione o Veículo", options=placas, index=idx_veic)
             mec_idx = nomes_mecanicos.index(defaults["mecanico"]) if defaults.get("mecanico") in nomes_mecanicos else (
                 nomes_mecanicos.index(MECANICO_PADRAO) if MECANICO_PADRAO in nomes_mecanicos else 0
             )
@@ -600,7 +582,15 @@ aba_lanc, aba_edit, aba_painel, aba_cad = st.tabs([
 ])
 
 with aba_lanc:
-    render_formulario_os(sb, modo_edicao=False)
+    categoria_nova = st.selectbox(
+        "Categoria do Veículo",
+        options=list(CATEGORIAS.keys()),
+        format_func=lambda x: CATEGORIAS[x],
+        key="os_categoria_nova",
+    )
+    qtd = len(carregar_veiculos(categoria_nova))
+    st.caption(f"{qtd} veículo(s) disponível(is) nesta categoria")
+    render_formulario_os(sb, categoria_nova, modo_edicao=False)
 
 with aba_edit:
     pendentes = carregar_os_pendentes()
@@ -614,8 +604,12 @@ with aba_edit:
         sel = st.selectbox("Selecione a OS para editar/concluir", options=opcoes)
         idx = opcoes.index(sel)
         os_sel = pendentes[idx]
-        st.caption(f"Criada em {fmt_dt_br(os_sel.get('created_at'))} · {CATEGORIAS.get(os_sel.get('categoria_veiculo'), '')}")
-        render_formulario_os(sb, modo_edicao=True, os_existente=os_sel)
+        cat_os = os_sel.get("categoria_veiculo", "LEVE")
+        st.caption(
+            f"Criada em {fmt_dt_br(os_sel.get('created_at'))} · "
+            f"{CATEGORIAS.get(cat_os, cat_os)}"
+        )
+        render_formulario_os(sb, cat_os, modo_edicao=True, os_existente=os_sel)
 
 with aba_painel:
     render_painel()
