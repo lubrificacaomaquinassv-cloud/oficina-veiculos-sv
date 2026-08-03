@@ -275,7 +275,7 @@ def render_tabela_os(rows: list[dict], limite: int = 15):
         cls = "st-fin" if "FINAL" in status else "st-pend"
         linhas += (
             f"<tr><td>{o.get('numero_os', '—')}</td>"
-            f"<td>{CATEGORIAS.get(o.get('categoria_veiculo', ''), o.get('categoria_veiculo', '—'))}</td>"
+            f"<td>{CATEGORIAS.get(o.get('categoria', ''), o.get('categoria', '—'))}</td>"
             f"<td>{o.get('placa', '—')}</td>"
             f"<td>{o.get('tipo_servico', '—')}</td>"
             f"<td>{o.get('prestador_nome') or PRESTADOR_INTERNO}</td>"
@@ -440,7 +440,7 @@ def render_formulario_os(
     prestador_nome = None if prestador_sel == PRESTADOR_INTERNO else prestador_sel
 
     payload = {
-        "categoria_veiculo": categoria,
+        "categoria": categoria,
         "veiculo_id": veic["id"],
         "placa": veic["placa"],
         "modelo": veic["modelo"],
@@ -451,7 +451,7 @@ def render_formulario_os(
         "tipo_servico": tipo_servico,
         "hora_entrada": str(he) if he else None,
         "hora_saida": str(hs) if hs else None,
-        "tempo_min": tempo_min,
+        "tempo_minutos": tempo_min,
         "operador": (operador.strip().upper() or None),
         "status": status_os,
         "descricao": descricao.strip(),
@@ -635,15 +635,41 @@ def dark_table_fin(df: pd.DataFrame, height: int = 280):
 @st.cache_data(ttl=10)
 def carregar_financeiro_custos(limit: int = 500):
     sb = get_supabase()
-    res = (
-        tbl(sb, "financeiro_custos")
-        .select("*")
-        .order("data", desc=True)
-        .order("criado_em", desc=True)
-        .limit(limit)
-        .execute()
+    cols = (
+        "id, os_id, numero_os, data, categoria, placa, mecanico, item, "
+        "tipo_manutencao, descricao_peca, nfe, id_fornecedor_sap, quantidade, "
+        "valor_unitario, valor, tempo_minutos_mecanico, custo_hora_mecanico, "
+        "custo_mo_mecanico, observacao, created_at"
     )
-    return res.data or []
+    queries = [
+        lambda: (
+            tbl(sb, "financeiro_custos")
+            .select(cols)
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        ),
+        lambda: (
+            tbl(sb, "financeiro_custos")
+            .select(cols)
+            .order("data", desc=True)
+            .limit(limit)
+            .execute()
+        ),
+        lambda: (
+            tbl(sb, "financeiro_custos")
+            .select("*")
+            .limit(limit)
+            .execute()
+        ),
+    ]
+    last_exc = None
+    for run in queries:
+        try:
+            return run().data or []
+        except Exception as exc:
+            last_exc = exc
+    raise last_exc or RuntimeError("financeiro_custos indisponivel")
 
 
 @st.cache_data(ttl=15)
@@ -652,8 +678,8 @@ def carregar_os_para_financeiro():
     res = (
         tbl(sb, "ordens_servico")
         .select(
-            "id, numero_os, placa, modelo, categoria_veiculo, mecanico, "
-            "tipo_servico, tempo_min, status, hora_entrada, hora_saida"
+            "id, numero_os, placa, modelo, categoria, mecanico, "
+            "tipo_servico, tempo_minutos, status, hora_entrada, hora_saida"
         )
         .order("created_at", desc=True)
         .limit(200)
@@ -675,7 +701,7 @@ def custo_map_mecanicos() -> dict[str, float]:
 
 
 def calcular_mo_mecanico(os_row: dict) -> tuple[int, float, float]:
-    tempo = int(os_row.get("tempo_min") or 0)
+    tempo = int(os_row.get("tempo_minutos") or 0)
     if tempo <= 0:
         he, hs = os_row.get("hora_entrada"), os_row.get("hora_saida")
         if he and hs:
@@ -686,7 +712,7 @@ def calcular_mo_mecanico(os_row: dict) -> tuple[int, float, float]:
 
 
 def label_os_fin(o: dict) -> str:
-    cat = o.get("categoria_veiculo", "")
+    cat = o.get("categoria", "")
     placa = o.get("placa", "")
     if cat in ("PESADO", "MOTO") and o.get("modelo"):
         veic = f"{placa} - {o['modelo']}"
@@ -705,7 +731,15 @@ def render_financeiro(sb: Client):
         "Sem hora de operador — leves e motos permanecem na adm."
     )
 
-    lancamentos = carregar_financeiro_custos()
+    lancamentos = []
+    try:
+        lancamentos = carregar_financeiro_custos()
+    except Exception as exc:
+        st.error(
+            "Não foi possível carregar lançamentos financeiros. "
+            "Verifique se a migração 006/007 foi aplicada no Supabase "
+            f"(tabela `oficina_veiculos.financeiro_custos`). Detalhe: {exc}"
+        )
     os_list = carregar_os_para_financeiro()
 
     st.markdown('<div class="sec">Resumo do dia</div>', unsafe_allow_html=True)
@@ -824,7 +858,7 @@ def render_financeiro(sb: Client):
                 "os_id": os_sel.get("id"),
                 "numero_os": os_sel["numero_os"],
                 "data": str(data_lanc),
-                "categoria_veiculo": os_sel["categoria_veiculo"],
+                "categoria": os_sel["categoria"],
                 "placa": os_sel["placa"],
                 "mecanico": os_sel.get("mecanico"),
                 "item": item,
@@ -835,7 +869,7 @@ def render_financeiro(sb: Client):
                 "quantidade": qtd_final,
                 "valor_unitario": round(float(valor_unit), 2) if item == "PECAS" else None,
                 "valor": val_final,
-                "tempo_min_mecanico": tempo_min if item == "M.O. MECANICO" else None,
+                "tempo_minutos_mecanico": tempo_min if item == "M.O. MECANICO" else None,
                 "custo_hora_mecanico": custo_h if item == "M.O. MECANICO" else None,
                 "custo_mo_mecanico": val_final if item == "M.O. MECANICO" else None,
                 "observacao": observacao.strip() or None,
@@ -852,7 +886,7 @@ def render_financeiro(sb: Client):
         f'<div class="sec">Lançamentos em {filtro_data.strftime("%d/%m/%Y")}</div>',
         unsafe_allow_html=True,
     )
-    lanc_dia = lancamentos_do_dia(carregar_financeiro_custos(), filtro_data)
+    lanc_dia = lancamentos_do_dia(lancamentos, filtro_data)
     if lanc_dia:
         df = pd.DataFrame(lanc_dia)
         show = df[
@@ -897,7 +931,7 @@ def render_financeiro(sb: Client):
                     df_r.rename(
                         columns={
                             "numero_os": "OS",
-                            "categoria_veiculo": "Cat.",
+                            "categoria": "Cat.",
                             "placa": "Placa",
                             "custo_pecas": "Peças",
                             "custo_oleo": "Óleo",
@@ -981,7 +1015,7 @@ with aba_edit:
         sel = st.selectbox("Selecione a OS para editar/concluir", options=opcoes)
         idx = opcoes.index(sel)
         os_sel = pendentes[idx]
-        cat_os = os_sel.get("categoria_veiculo", "LEVE")
+        cat_os = os_sel.get("categoria", "LEVE")
         st.caption(
             f"Criada em {fmt_dt_br(os_sel.get('created_at'))} · "
             f"{CATEGORIAS.get(cat_os, cat_os)}"
