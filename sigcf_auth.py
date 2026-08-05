@@ -3,6 +3,7 @@ import base64
 from pathlib import Path
 
 import streamlit as st
+from supabase import create_client
 
 LOGO_URL = "https://raw.githubusercontent.com/lubrificacaomaquinassv-cloud/painel-frota-sv/main/icons/logo_sv.png"
 LOGO_URL_LEGACY = "https://i.postimg.cc/Y9X7ddnb/LOGO-BP.jpg"
