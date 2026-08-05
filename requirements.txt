@@ -1,5 +1,4 @@
-# Oficina Veículos SV — Streamlit Cloud
-# IMPORTANTE: no deploy, selecione Python 3.12 (não 3.14)
-streamlit>=1.35.0,<1.60
-supabase>=2.0.0,<3
-pandas>=2.0.0,<3.0
+streamlit>=1.35.0,<1.60.0
+starlette>=0.40.0,<0.42.0
+pandas>=2.0.0,<3.0.0
+supabase>=2.0.0,<3.0.0
