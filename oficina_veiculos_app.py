@@ -7,9 +7,9 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
-from supabase import Client, create_client
+from supabase import Client
 
-from sigcf_auth import BG_URL, LOGO_URL, exigir_acesso, link_instagram, logo_html
+from sigcf_auth import BG_URL, LOGO_URL, conectar_supabase, exigir_acesso, link_instagram, logo_html
 
 TZ_BR = ZoneInfo("America/Sao_Paulo")
 SCHEMA = "oficina_veiculos"
@@ -173,7 +173,7 @@ def calc_tempo_min(hora_entrada_txt: str, hora_saida_txt: str) -> int | None:
 
 @st.cache_resource
 def get_supabase() -> Client:
-    return create_client(st.secrets["SUPABASE_URL"], st.secrets["SUPABASE_KEY"])
+    return conectar_supabase()
 
 
 def tbl(sb: Client, nome: str):
